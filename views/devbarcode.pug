@@ -1,0 +1,140 @@
+extends layout
+
+block content
+    .row.doNotPrint
+        .col
+        .col-sm-8
+            p ※生成するバーコードを改行区切りで入力します。<br/>※顧客管理番号を入力する場合、マッチする保管箱番号があったら同時に表示します。
+        .col
+    .row.doNotPrint
+        .col
+        .col-sm-6
+            .input-group
+                .input-group-prepend
+                    span.input-group-text バーコード<br/>入力
+                textarea#inputBarcode.form-control(aria-label="With textarea")
+        .col-sm-1
+            span または
+        .col-sm-1
+            button#randomBarcode.btn.btn-primary RANDOM<br/>箱バーコード
+        .col
+    .row
+        .col
+        .col-sm-8#barcodeResult.text-center.printThis
+        .col
+    <!-- script -->
+    script(src="/static/javascripts/JsBarcode.code128.min.js")
+    script.
+        const makeBarcodeFrame = async (aryBarcode) => {
+            let barcode1 = '',
+                barcode2 = '';
+            const table = $('<table>').addClass('table table-bordered');
+            $('#barcodeResult').append(table);
+
+            try {
+                for (let idx = 0; idx < aryBarcode.length; idx++ ){
+                    barcode1 = aryBarcode[idx];
+                    
+
+
+                    const tr = $('<tr>');
+                    tr.append($('<th>').text(idx+1));
+                    tr.append($('<td>').append($('<img>').attr('id','barcode1Img'+idx)));
+                    if ( /^\d{20}$/.test(barcode1) ) { // 顧客管理番号の場合、保管箱番号を準備する
+                        tr.append($('<td>').append($('<img>').attr('id','barcode2Img'+idx)));
+                    }
+                    table.append(tr);
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        };
+
+        var enableBarcodeImg = async (ary) => {
+            let barcode2 = '';
+
+            for(let i = 0; i < ary.length; i++) {
+                
+                JsBarcode('#barcode1Img'+i, ary[i], {height: 50});
+                
+                if (/^\d{20}$/.test(ary[i]) && $('#barcode2Img'+i)) {
+                    await axios.get('/barcode1/' + ary[i] )
+                    .then(res => {
+                        if (res.data.recordset.length > 0){
+                            barcode2 = res.data.recordset[0].F_保管箱番号;
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                    });
+
+                    JsBarcode('#barcode2Img'+i, barcode2, {height: 50});
+                }
+            }
+        };
+        
+        var ta = document.getElementById('inputBarcode');
+        ta.oninput = () => {
+            $('#barcodeResult').empty();
+            if (ta.value !== '') {
+                const rawBarcode = ta.value;
+                let aryBarcode = rawBarcode.split('\n');
+                makeBarcodeFrame(aryBarcode);
+                enableBarcodeImg(aryBarcode);
+            }
+        };
+
+        var getBarcode = function( sNum ) {
+            let iSum = 0,
+                i, sDigit, iCd,
+                strNum = '';
+
+            if (!/^\d{8}$/.test(sNum)) {
+                return -1;
+            }
+
+            if (typeof(sNum) === 'number'){
+                strNum = sNum.toString();
+            } else if (typeof(sNum) === 'string') {
+                strNum = sNum;
+            } else {
+                return -1;
+            }
+
+            for(i = 0; i < strNum.length; i++ ){
+                iDigit = parseInt(strNum.charAt(i));
+                if ( i % 2 == 1 ){
+                    iDigit *= 2
+                    if ( iDigit >= 10 ) {
+                        iSum += parseInt(iDigit / 10);
+                        iSum += iDigit % 10;
+                    } else {
+                        iSum += iDigit;
+                    }
+                } else {
+                    iSum += iDigit;
+                }
+            }
+
+            iCd = iSum % 10;
+            if ( iCd > 0 ) {
+                iCd = 10 - ( iSum % 10 );
+            }
+
+            return strNum + iCd.toString();
+        };
+
+        var getRndInteger = (min, max) => {
+            return Math.floor(Math.random() * (max - min) ) + min;
+        }
+
+        var btn = document.getElementById('randomBarcode');
+        btn.onclick = (e) => {
+            let aryBarcode = [];
+            for (let i = 0; i < 100; i++) {
+                aryBarcode.push(getBarcode(getRndInteger(30000000,90000000)));
+            }
+            $('#barcodeResult').empty();
+            makeBarcodeFrame(aryBarcode);
+            enableBarcodeImg(aryBarcode);
+        };

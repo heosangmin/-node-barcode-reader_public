@@ -1,0 +1,299 @@
+extends layout
+
+block content
+    <!-- alert -->
+    .row(style="display=none;")
+        .col
+            #msgAlert.alert.text-center(role="alert")
+
+    <!-- 依頼番号選択 -->
+    form#listForm
+        .form-group
+            .row
+                .col-sm-8
+                    .input-group
+                        .input-group-prepend
+                            label.input-group-text(for="reqFormControlSelect") 依頼受付番号
+                        select#reqFormControlSelect.form-control(data-demanddate=reqDemandDate)
+                            option(value='00000000000000') 依頼を選択してください。（希望日：#{reqDemandDate}）
+                            if reqList
+                                each req in reqList
+                                    if !req.F_ステータス
+                                        option(value=req.F_依頼種別コード+req.F_依頼年月日+req.F_依頼ID) #{req.F_依頼種別コード} #{req.F_依頼年月日} #{req.F_依頼ID} （スキャン完了：#{req.F_箱バーコード登録数}/#{req.F_依頼箱数}）
+                                    else
+                                        option(value=req.F_依頼種別コード+req.F_依頼年月日+req.F_依頼ID data-done=true) #{req.F_依頼種別コード} #{req.F_依頼年月日} #{req.F_依頼ID} （依頼箱数：#{req.F_依頼箱数}）（入庫照合済み）
+                .col-sm-4
+                    .input-group
+                        .input-group-prepend
+                            span.input-group-text 希望日
+                        input#inpReqDemandDate.form-control.text-center(type="text" placeholder="YYYY/MM/DD" aria-label="希望日" name="reqDemanDate" value=reqDemandDate)
+                        .input-group-append
+                            button#btnReqDemandDate.btn.btn-outline-primary(type="button") 更新
+
+    <!-- 依頼箱一覧 -->
+    .row
+        .col#reqCartonList
+    
+    <!-- script -->
+    script(src="/static/javascripts/moment-with-locales.js")
+    script.
+        var clearAlert = () => {
+            $("#msgAlert").hide();
+        };
+        var alertGreen = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-danger").removeClass("alert-light").removeClass("alert-warning").addClass("alert-success");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+        };
+        var alertRed = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-success").removeClass("alert-light").removeClass("alert-warning").addClass("alert-danger");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+        };
+        var alertYellow = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-success").removeClass("alert-danger").removeClass("alert-light").addClass("alert-warning");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+        };
+
+        var isEmptyBarcode = false;
+        var formSelect = document.getElementById('reqFormControlSelect');
+        var inpReqDemandDate = document.getElementById('inpReqDemandDate');
+        var btnReqDemandDate = document.getElementById('btnReqDemandDate');
+        
+        var alertRed = (msg) => {
+            $("#msgAlert").removeClass();
+            $("#msgAlert").addClass('alert alert-danger text-center');
+            $("#msgAlert").text(msg);
+            $("#msgAlert").show();
+        };
+
+        var alertGreen = (msg) => {
+            $("#msgAlert").removeClass();
+            $("#msgAlert").addClass('alert alert-success text-center');
+            $("#msgAlert").text(msg);
+            $("#msgAlert").show();
+        };
+        
+        var getReqCartonList = () => {
+            isEmptyBarcode = false;
+            formSelect.setAttribute('data-req',formSelect.value);
+            axios.get('/list/' + formSelect.value)
+            .then(res => {
+                if (res.data.length > 0) {
+                    makeReqCartonList(res.data, formSelect.value);
+                    for (let i=0; i<res.data.length; i++) {
+                        if (res.data[i].F_箱バーコード === null) {
+                            isEmptyBarcode = true;
+                            break;
+                        }
+                    }
+                } else {
+                    $('#reqCartonList').empty();
+                }
+            })
+            .catch(err => {
+                console.error(err);
+            });
+        };
+
+        var uploadCarton = (req) => {
+            const btn = $('#btnUpload');
+            const api = axios.create({timeout: 60000});
+            
+            btn.attr('disabled', true);
+            btn.text('アップロード中');
+
+            api.post('/list/upload/',{req: req})
+            .then(res => {
+                //console.log(res);
+                if (res.data[res.data.length-1][0].errorDetail) {
+                    const resultCode = res.data[res.data.length-1][0].errorCode;
+                    const resultDetail = res.data[res.data.length-1][0].errorDetail;
+                    switch (resultCode) {
+                        case 0:
+                            alertGreen(resultDetail);
+                            break;
+                        case 1:
+                            alertYellow(resultDetail);
+                            break;
+                        case 3:
+                            alertYellow(resultDetail);
+                            break;
+                        case -1:
+                            alertRed(resultDetail);
+                            break;
+                        default:
+                            alertRed(`予期せぬエラーが発生しました。`);
+                            console.error(res)
+                    }
+                    getReqCartonList();
+                } else {
+                    alertRed('アップロード失敗しました。');
+                }
+                btn.attr('disabled', false);
+                btn.text('アップロード');
+                document.documentElement.scrollTop = 0;
+            })
+            .catch(err => {
+                console.error(err);
+                alertRed('システムエラー：アップロード失敗');
+                btn.attr('disabled', false);
+                btn.text('アップロード');
+                document.documentElement.scrollTop = 0;
+            });
+        };
+
+        formSelect.onchange = () => {
+            clearAlert();
+            getReqCartonList();
+        };
+
+        var makeReqCartonList = function(list, req){
+            var rcl = $('#reqCartonList'),
+                table,thead,tbody,tr,trSub,
+                btn;
+            
+            rcl.empty();
+            table = $('<table>').addClass('table table-bordered table-sm table-light');
+            
+            thead = $('<thead>').addClass('thead-light');
+            thead
+            .append(
+                $('<tr>')
+                .append($('<th>').attr('rowspan','2').text('#'))
+                .append($('<th>').attr('rowspan','2').text('箱バーコード'))
+                .append($('<th>').attr('rowspan','2').text('箱記号番号'))
+                .append($('<th>').attr('colspan','3').text('スキャン'))
+                .append($('<th>').attr('colspan','3').text('アップロード'))
+            )
+            .append(
+                $('<tr>')
+                .append($('<th>').attr('colspan','2').text('日時'))
+                .append($('<th>').text('作業者コード'))
+                .append($('<th>').text('日時'))
+                .append($('<th>').text('作業者コード'))
+                .append($('<th>').text('メッセージ'))
+            );
+
+            table.append(thead);
+            
+            tbody = $('<tbody>');
+            list.forEach( (carton, idx) => {
+                tr = $('<tr>');
+                tr.append($('<td>').attr('rowspan','3').attr('style','vertical-align:middle').text(idx+1));
+                tr.append($('<td>').attr('rowspan','3').attr('style','vertical-align:middle').text(carton.F_箱バーコード));
+                tr.append($('<td>').attr('rowspan','3').attr('style','vertical-align:middle').text(carton.F_箱記号 + ' - ' + carton.F_箱番号));
+                tr.append($('<th>').text('１次'));
+                tr.append($('<td>').text(carton.F_１次スキャン日時));
+                tr.append($('<td>').text(carton.F_１次スキャン作業者コード));
+                tr.append($('<td>').attr('rowspan','3').text(carton.F_アップロード日時));
+                tr.append($('<td>').attr('rowspan','3').text(carton.F_アップロード作業者コード));
+                tr.append($('<td>').attr('rowspan','3').text(carton.F_アップロードメッセージ));
+                tbody.append(tr);
+
+                tbody.append(
+                    $('<tr>')
+                    .append($('<th>').text('２次'))
+                    .append($('<td>').text(carton.F_２次スキャン日時))
+                    .append($('<td>').text(carton.F_２次スキャン作業者コード))
+                );
+                tbody.append(
+                    $('<tr>')
+                    .append($('<th>').text('３次'))
+                    .append($('<td>').text(carton.F_３次スキャン日時))
+                    .append($('<td>').text(carton.F_３次スキャン作業者コード))
+                );
+                
+            });
+
+            table.append(tbody);
+
+            rcl.append(table);
+
+            // upload button
+            btn = $('<button>').attr('id','btnUpload').addClass('btn btn-primary btn-lg btn-block').text('アップロード');
+
+            btn.on('click', (e) => {
+                if (isEmptyBarcode) {
+                    if (confirm('箱バーコード未登録の箱があります。アップロードしますか。')){
+                        uploadCarton(formSelect.value);
+                        // update req select
+                        axios.post('/list', {reqDemandDate: inpReqDemandDate.value})
+                        .then(res => {
+                            updateReqSelect(res,inpReqDemandDate.value,false);
+                        })
+                        .catch(err => {
+                            console.error(err);
+                        });
+                    }
+                } else {
+                    uploadCarton(formSelect.value);
+                    // update req select
+                    axios.post('/list', {reqDemandDate: inpReqDemandDate.value})
+                    .then(res => {
+                        updateReqSelect(res,inpReqDemandDate.value,false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                    });
+                }
+
+
+            });
+            rcl.append(btn);
+        };
+
+        var updateReqSelect = (res, demandDate, enableAlert) => {
+            $('#reqFormControlSelect').empty();
+            if (res.data && res.data.length > 0) {
+                $('#reqFormControlSelect').append($('<option>').attr('value','00000000000000').text(`依頼を選択してください。（希望日：${inpReqDemandDate.value}）`));
+                res.data.forEach((req, idx) => {
+                    var option = $('<option>')
+                                 .attr('value',`${req.F_依頼種別コード}${req.F_依頼年月日}${req.F_依頼ID}`)
+                                 .text(`${req.F_依頼種別コード} ${req.F_依頼年月日} ${req.F_依頼ID} （スキャン完了：${req.F_箱バーコード登録数}/${req.F_依頼箱数}）${req.F_ステータス ? '（入庫照合済み）' : ''}`);
+                    if (formSelect.getAttribute('data-req') === option.val()) {
+                        option.attr('selected',true);
+                    }
+                    $('#reqFormControlSelect').append(option);
+                });
+                if (enableAlert) {
+                    alertGreen(`希望日「${demandDate}」の依頼受付番号に更新しました。`);
+                }
+            } else {
+                if (enableAlert) {
+                    alertRed(`希望日「${demandDate}」の依頼がありません。`);
+                }
+            }
+        };
+
+        btnReqDemandDate.onclick = () => {
+            const demandDate = inpReqDemandDate.value;
+            if (/^20\d{2}\/\d{2}\/\d{2}$/.test(demandDate)) {
+                axios.post('/list', {reqDemandDate: demandDate})
+                .then(res => {
+                    formSelect.setAttribute('data-demanddate',demandDate);
+                    formSelect.removeAttribute('data-req');
+                    updateReqSelect(res,demandDate,true);
+                    $('#reqCartonList').empty();
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+            } else {
+                alertRed('正しくない希望日です。「YYYY/MM/DD」形式で入力してください。');
+            }
+        };
+        
+        inpReqDemandDate.onkeypress = (e) => {
+            if (e.which === 13) {
+                e.preventDefault();
+                btnReqDemandDate.onclick();
+            }
+        };
+
+        // init
+        clearAlert();
+        $('#inpReqDemandDate').datepicker({
+            dateFormat: 'yy/mm/dd'
+        });

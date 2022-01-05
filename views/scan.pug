@@ -1,0 +1,428 @@
+extends layout
+
+block content
+    <!-- progress bar -->
+    .row
+        .col
+            .progress(style='height:50px;font-size:1.1em')
+                #pb.progress-bar(role='progressbar' aria-valuenow="0" aria-valuemin="0" aria-valuemax="100")
+    
+    <!-- blank -->
+    .row
+        .col &nbsp;
+    
+    <!-- input barcode -->
+    .row
+        .col
+            form(action="#")
+                .inputGroup.mb-3
+                    .input-group-prepend.input-group-lg
+                        input(type="text" class="form-control" placeholder="バーコードをスキャンしてください。" aria-label="barcode" aria-describedby="buttonScanBarcode" data-toggle="popover" data-content="正しいバーコードを入力してください。" data-placement="left" id="inputBarcode" onblur="this.focus()" autofocus)
+    
+    <!-- alert -->
+    .row(style="display=none;margin-bottom:20px;font-size:2em")
+        .col
+            #msgAlert.alert.alert-light.text-center(role="alert")
+    
+    <!-- result table -->
+    .row
+        .col-sm-7#scanResult
+        .col-sm-5#scanResultSub
+    
+    <!-- script -->
+    script.
+        var changeProgressBar = (level) => {
+            switch (level) {
+                case 1:
+                    progressBar.attr("style","width:50%");
+                    progressBar[0].innerText = MSG_STEP_1;
+                    break;
+                case 2:
+                    progressBar.attr("style","width:75%");
+                    progressBar[0].innerText = MSG_STEP_2;
+                    break;
+                case 3:
+                    progressBar.attr("style","width:100%");
+                    progressBar[0].innerText = MSG_STEP_3;
+                    break;
+                default:
+                    progressBar.attr("style","width:25%");
+                    progressBar[0].innerText = MSG_STEP_0;
+                    barcode1 = '';
+                    barcode2 = '';
+                    barcode3 = '';
+                    setStatus(STATUS_BARCODE_NONE);
+                    clearHighlight();
+            }
+        };
+
+        var updateScanResultTable = (data, highlight) => {
+            let sdt = $('#scanResult'),
+                sdts = $('#scanResultSub'),
+                table, thead, tbody, tr, span, th, td,
+                barcode2_part1, barcode2_part2;
+
+            barcode2_part1 = /^[A-Z]?\d{4,5}-[A-Z0-9]{1,3}-/.exec(data.F_保管箱番号)[0];
+            barcode2_part2 = /\d+$/.exec(data.F_保管箱番号)[0];
+
+            sdt.empty();
+            sdts.empty();
+
+            // nus
+            table = $('<table>').addClass('table table-bordered table-light').attr('id','nusResult');
+
+            tr = $('<tr>');
+            tr.append($('<th>').attr('scope','col').attr('colspan',4).text('シール情報'));
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').text('移管番号'));
+            tr.append($('<td>').text(data.F_移管番号).attr('style','padding:0;font-size:3em;color:red'));
+            tr.append($('<th>').text('移管日'));
+            tr.append($('<td>').text(data.F_移管日));
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').text('顧客管理番号'));
+            tr.append($('<td>').attr('colspan','3').text(data.F_顧客管理番号));
+            if (highlight.barcode1) tr.addClass('table-primary');
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').text('保管箱番号'));
+            tr.append($('<td>').attr('colspan','3').attr('style','padding:0;font-size:3em').append(
+                $('<span>').text(barcode2_part1)).append($('<span>').text(barcode2_part2).attr('style','color:red'))
+            );
+            if (highlight.barcode2) tr.addClass('table-primary');;
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').text('保管期限'));
+            tr.append($('<td>').attr('colspan','3').text(data.F_保管期限));
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').text('部室店名'));
+            tr.append($('<td>').attr('colspan','3').text(data.F_部室店名));
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').text('入庫日'));
+            tr.append($('<td>').text(data.F_入庫日));
+            tr.append($('<td>').attr('colspan','2').text(data.F_顧客名称));
+            table.append(tr);
+            
+            sdt.append(table);
+
+            table = $('<table>').addClass('table table-bordered table-light').attr('id','result');
+
+            tr = $('<tr>');
+            tr.append($('<th>').attr('scope','col').attr('colspan',3).text('依頼箱情報'));
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').attr('colspan',2).text('依頼受付番号'));
+            tr.append($('<td>').text(`${data.F_依頼種別コード}${data.F_依頼年月日}${data.F_依頼ID}`));
+            table.append(tr);
+            
+            tr = $('<tr>');
+            tr.append($('<th>').attr('colspan',2).text('箱記号番号'));
+            tr.append($('<td>').text(data.F_箱記号 + ' - ' + data.F_箱番号));
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').attr('colspan',2).text('箱バーコード'));
+            tr.append($('<td>').text(data.F_箱バーコード));
+            if (highlight.barcode3) tr.addClass('table-primary');;
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append(
+                $('<td>').attr('rowspan',3).attr('style','font-size:1em')
+                    .append($('<span>').text('ス'))
+                    .append($('<br>'))
+                    .append($('<span>').text('キ'))
+                    .append($('<br>'))
+                    .append($('<span>').text('ャ'))
+                    .append($('<br>'))
+                    .append($('<span>').text('ン'))
+                    .append($('<br>'))
+                    .append($('<span>').text('日'))
+                    .append($('<br>'))
+                    .append($('<span>').text('時'))
+            );
+            th = $('<th>').text('顧客管理番号');
+            if (highlight.scanDate1) th.addClass('table-primary');;
+            tr.append(th);
+            td = $('<td>').text(data.F_１次スキャン日時);
+            if (highlight.scanDate1) td.addClass('table-primary');;
+            tr.append(td);
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').append($('<span>').text('保管箱番号')));
+            tr.append($('<td>').text(data.F_２次スキャン日時));
+            if (highlight.scanDate2) tr.addClass('table-primary');;
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').append($('<span>').text('箱バーコード')));
+            tr.append($('<td>').text(data.F_３次スキャン日時));
+            if (highlight.scanDate3) tr.addClass('table-primary');;
+            table.append(tr);
+
+            tr = $('<tr>');
+            tr.append($('<th>').attr('colspan',2).append($('<span>').text('アップロード日時')));
+            tr.append($('<td>').text(data.F_アップロード日時));
+            table.append(tr);
+
+            sdts.append(table);
+        };
+
+        var clearScanResultTable = () => {
+            $('#scanResult').empty();
+            $('#scanResultSub').empty();
+        };
+
+        var clearAlert = () => {
+            $("#msgAlert").hide();
+        };
+
+        var alertBlue = (msg) => {
+            $("#msgAlert").removeClass("alert-success").removeClass("alert-danger").removeClass("alert-light").removeClass("alert-warning").addClass("alert-primary");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+        };
+        var alertGreen = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-danger").removeClass("alert-light").removeClass("alert-warning").addClass("alert-success");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+        };
+        var alertRed = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-success").removeClass("alert-light").removeClass("alert-warning").addClass("alert-danger");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+            
+            console.log('sound play');
+            soundEffect01.play();
+        };
+        var alertWhite = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-success").removeClass("alert-danger").removeClass("alert-warning").addClass("alert-light");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+        };
+        var alertYellow = (msg) => {
+            $("#msgAlert").removeClass("alert-primary").removeClass("alert-success").removeClass("alert-danger").removeClass("alert-light").addClass("alert-warning");
+            $("#msgAlert")[0].innerText = msg;
+            $("#msgAlert").show();
+
+            console.log('sound play');
+            soundEffect01.play();
+        };
+
+        var clearHighlight = () => {
+            highlight.scanDate1 = false;
+            highlight.scanDate2 = false;
+            highlight.scanDate3 = false;
+            highlight.barcode1 = false;
+            highlight.barcode2 = false;
+            highlight.barcode3 = false;
+        };
+
+        var setStatus = (status) => {
+            _bss = status;
+        };
+
+        var api = axios.create({
+            timeout: 5000
+        });
+
+        var progressBar = $("#pb"),
+            inputBarcode = $("#inputBarcode"),
+            barcodeResult = $("#barcodeResult");
+
+        // barcodeScanStatus
+        const STATUS_BARCODE_NONE = 0;
+        const STATUS_BARCODE_SCANNED_1 = 1;
+        const STATUS_BARCODE_SCANNED_2 = 2;
+        const STATUS_BARCODE_SCANNED_3 = 3;
+
+        const MSG_STEP_0 = "【０】スキャン待ち";
+        const MSG_STEP_1 = "【１】顧客管理番号スキャン済み";
+        const MSG_STEP_2 = "【２】保管箱番号スキャン済み";
+        const MSG_STEP_3 = "【３】箱バーコードスキャン済み";
+        
+        var _bss = STATUS_BARCODE_NONE;
+
+        // audio
+        var soundEffect01 = document.getElementById("audioFile01");
+
+        // always focus on input
+        var ib = document.getElementById("inputBarcode");
+
+        // input check
+        const reBarcodeType01 = /^\d{20}$/;
+        const reBarcodeType02 = /^[A-Z]?\d{4,5}-[A-Z0-9]{1,3}-\d{4}$/;
+        const reBarcodeType03 = /^\d{9}$/;
+
+        // temp storing
+        var barcode1 = '';
+        var barcode2 = '';
+        var barcode3 = '';
+        var highlight = {
+            barcode1: false,
+            barcode2: false,
+            barcode3: false,
+            scanDate1: false,
+            scanDate2: false,
+            scanDate3: false,
+        };
+
+        // initialize elements
+        barcodeResult.hide();
+        clearAlert();
+        changeProgressBar(0);
+
+        ib.onfocus = (e) => {ib.select();};
+
+        var scanBarcode = () => {
+            var isBarcodeType1 = reBarcodeType01.test(ib.value),
+                isBarcodeType2 = reBarcodeType02.test(ib.value),
+                isBarcodeType3 = reBarcodeType03.test(ib.value);
+            
+            //console.log('status : ', _bss);
+            //console.log('input : ', ib.value);
+            //console.log('test1 : ', isBarcodeType1);
+            //console.log('test2 : ', isBarcodeType2);
+            //console.log('test3 : ', isBarcodeType3);
+
+            $(".colorChangeTargetTR").removeClass("table-success").removeClass("table-danger");
+
+            if (isBarcodeType1) { 
+                /*
+                    １次スキャン
+                    最初に「顧客管理番号」スキャン成功
+                */
+
+                setStatus(STATUS_BARCODE_SCANNED_1);
+                clearHighlight();
+                
+                api.get('/barcode1/' + ib.value)
+                .then((res) => {
+                    if (res.data.recordset.length > 0) {
+                        
+                        if (!/^[789]$/.test(res.data.recordset[0].F_アップロード作業コード)) { // 箱バーコード登録可能状態（入庫照合未完了）
+                            barcode1 = res.data.recordset[0].F_顧客管理番号;
+                            barcode2 = res.data.recordset[0].F_保管箱番号;
+                            barcode3 = res.data.recordset[0].F_箱バーコード;
+                            highlight.scanDate1 = true;
+                            highlight.barcode1 = true;
+                            updateScanResultTable(res.data.recordset[0], highlight);
+                            changeProgressBar(1);
+                            alertGreen("顧客管理番号をスキャン成功");
+                        } else {
+                            highlight.barcode1 = true;
+                            updateScanResultTable(res.data.recordset[0], highlight);
+                            changeProgressBar(0);
+                            alertRed("入庫照合済みです。");
+                        }
+                    } else {
+                        alertRed("該当する箱情報がありません。");
+                        clearScanResultTable();
+                        changeProgressBar(0);
+                    }
+                })
+                .catch(err => {
+                    console.error('request error', err);
+                    alertRed("システムエラー：リクエストエラー発生");
+                    changeProgressBar(0);
+                });
+
+            } else if (( isBarcodeType2 || isBarcodeType3 ) && _bss === STATUS_BARCODE_NONE) {
+                /*
+                    最初に「保管箱番号」スキャン成功（スキャン順番失敗）
+                */
+                changeProgressBar(0);
+                clearScanResultTable();
+                alertYellow("スキャン順番エラー：顧客管理番号をスキャンしてください。");
+            } else if (isBarcodeType2 && _bss === STATUS_BARCODE_SCANNED_1) {
+                
+                /*
+                    ２次スキャン
+                    「顧客管理番号」をスキャンした状態で「保管箱番号」をスキャン成功
+                */
+                setStatus(STATUS_BARCODE_SCANNED_2);
+
+                if (ib.value === barcode2) {
+                    changeProgressBar(2);
+                    alertGreen("保管箱番号スキャン成功");
+                    api.put('/barcode2/' + ib.value, {
+                        barcode1: barcode1
+                    }).then((res)=>{
+                        highlight.scanDate2 = true;
+                        highlight.barcode2 = true;
+                        updateScanResultTable(res.data.recordset[0], highlight);
+                    }).catch(err => {
+                        console.error('request error', err);
+                        setStatus(STATUS_BARCODE_NONE);
+                        changeProgressBar(0);
+                        alertRed("システムエラー：リクエストエラー発生");
+                    });
+                } else {
+                    alertRed("顧客管理番号と保管箱番号が一致しません。");
+                    $(".colorChangeTargetTR").addClass("table-danger");
+                    changeProgressBar(0);
+                }
+
+            } else if (isBarcodeType3 && _bss === STATUS_BARCODE_SCANNED_2) {
+
+                /*
+                    ３次スキャン
+                    「保管箱番号」をスキャンした状態で「箱バーコード」をスキャン成功
+                */
+                setStatus(STATUS_BARCODE_SCANNED_3);
+                changeProgressBar(3);
+
+                api.put('/barcode3/' + barcode1, {
+                    barcode1: barcode1,
+                    barcode2: barcode2,
+                    barcode3: ib.value
+                }).then(res => {
+                    if (res.data.error && res.data.error === 'duplicated') {
+                        const msg = `（箱記号番号：${res.data.cartonInfo[0].F_箱記号} - ${res.data.cartonInfo[0].F_箱番号}）`;
+                        changeProgressBar(0);
+                        alertRed('登録済みの箱バーコードです。' + msg );
+                    } else {
+                        highlight.scanDate3 = true;
+                        highlight.barcode3 = true;
+                        updateScanResultTable(res.data.recordset[0], highlight);
+                        alertGreen("箱バーコードスキャン成功");
+                    }
+                }).catch(err => {
+                    alertRed("システムエラー：リクエストエラー発生");
+                    changeProgressBar(0);
+                });
+
+                setStatus(STATUS_BARCODE_NONE);
+
+            } else if (ib.value === '') {
+                clearScanResultTable();
+                changeProgressBar(0);
+                alertWhite("");
+                clearAlert();
+            } else {
+                clearScanResultTable();
+                changeProgressBar(0);
+                alertRed("バーコード形式が正しくありません。");
+            }
+            ib.select();
+        };
+
+        ib.onkeypress = (e) => {
+            if (e.which === 13) {
+                e.preventDefault();
+                scanBarcode();
+            }
+        };
+        
+        ib.focus();

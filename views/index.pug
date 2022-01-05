@@ -1,0 +1,40 @@
+extends layout
+
+block content
+    <!-- login -->
+    form#loginForm.form-signin(action="/auth/login" method="post")
+        h1.h3.mb-3.font-weight-normal.text-center login
+        if loginError != ''
+            <!-- msg -->
+            .alert.alert-danger #{loginError}
+        
+        .btn-group.btn-group-toggle(data-toggle="buttons")
+            label.btn.btn-secondary
+                input#branchOption1(type="radio" name="branchCode" autocomplete="off" value="A")
+                span 厚木
+            label.btn.btn-secondary
+                input#branchOption2(type="radio" name="branchCode" autocomplete="off" value="B")
+                span 野田
+            label.btn.btn-secondary.active
+                input#branchOption3(type="radio" name="branchCode" autocomplete="off" value="D" checked)
+                span つくば
+            label.btn.btn-secondary
+                input#branchOption5(type="radio" name="branchCode" autocomplete="off" value="K")
+                span 伊丹
+            label.btn.btn-secondary
+                input#branchOption4(type="radio" name="branchCode" autocomplete="off" value="Z")
+                span 本社
+
+        label.sr-only(for="inputUsercode") 社員コード
+        input#inputUsercode.form-control(name="usercode" type="username" placeholder="社員コード" maxlength="4" required autofocus)
+        label.sr-only(for="inputPassword") Password
+        input#inputPassword.form-control(name="password" type="password" placeholder="パスワード" maxlength="16" required)
+        button#loginButton.btn.btn-lg.btn-primary.btn-block(type="submit") ログイン
+
+        script.
+            var form = document.getElementById('loginForm');
+            form.onsubmit = function() {
+                const branchCode = $('input[name=branchCode]:checked').val();
+                const userCode = $('#inputUsercode').val();
+                $('#inputUsercode').val(branchCode + userCode);
+            };

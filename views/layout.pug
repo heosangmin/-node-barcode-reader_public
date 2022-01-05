@@ -1,0 +1,33 @@
+doctype html
+html
+    head
+        title=title
+        link(rel='stylesheet',href='/static/stylesheets/bootstrap.min.css')
+        link(rel='stylesheet',href='/static/stylesheets/jquery-ui.min.css')
+        link(rel='stylesheet',href='/static/stylesheets/main.css')
+        script(src="/static/javascripts/jquery-3.4.1.min.js")
+        script(src="/static/javascripts/jquery-ui.min.js")
+        script(src="/static/javascripts/bootstrap.min.js")
+        script(src="/static/javascripts/axios.min.js")
+    body
+        audio#audioFile01(controls)
+            source(src='/static/audio/Windows Background.wav' type='audio/wav')
+
+        <!-- Fixed navbar -->
+        if user
+            nav.navbar.navbar-expand-md.navbar-dark.fixed-top.bg-dark
+                a.navbar-brand(href="#") #{title}
+                ul.navbar-nav.mr-auto
+                    li.nav-item(active)
+                        a.nav-link(href='/scan') スキャン
+                            span.sr-only (current)
+                    li.nav-item
+                        a.nav-link(href='/list') アップロード
+                    if env === 'development'
+                        li.nav-item
+                            a.nav-link(href='/devbarcode') テストバーコード作成
+                span.username #{user.branchCode}#{user.id}「#{user.name}」様
+                a.btn.btn-outline-success.my-2.my-sm-0(role="button" href="/auth/logout") ログアウト
+        
+        .container
+            block content
